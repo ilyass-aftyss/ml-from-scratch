@@ -1,65 +1,93 @@
 
+import numpy as np
 
-import numpy as np 
 
-class lineaireRegression : 
+class LinearRegression:
+    def __init__(self, learning_rate=0.01, epochs=1000):
+        if learning_rate <= 0:
+            raise ValueError("learning_rate doit être positif.")
 
-    # learning_rate --> controle la taille de modification apportées au modele !
-    # Une epochs --> correspond a un passage complet sur les données d'entrainement --> le modele combien il regarde les données 
-    def __init__(self,learning_rate = 0.01,epochs = 1000):
+        if epochs < 1 or not isinstance(epochs, int):
+            raise ValueError("epochs doit être un entier positif.")
+
         self.learning_rate = learning_rate
         self.epochs = epochs
-
         self.weights = None
         self.bias = None
-
         self.loss_history = []
 
-    def prediction(self , X) :
-        return X @ self.weights + self.bias
+    def _validate_X(self, X):
+        X = np.asarray(X, dtype=float)
 
-    # la fonction loss --> nous calculons une erreur pour savoir est ce que le modele est bonne 
+        if X.ndim != 2:
+            raise ValueError("X doit être un tableau 2D.")
 
+        if X.shape[0] == 0 or X.shape[1] == 0:
+            raise ValueError("X ne doit pas être vide.")
 
-    def compute_loss(self,y_true,y_pred) :
-        n = len(y_true)
+        if not np.all(np.isfinite(X)):
+            raise ValueError("X contient des valeurs non finies.")
 
-        return np.sum((y_true - y_pred) **2)/n
+        return X
 
+    def fit(self, X, y):
+        X = self._validate_X(X)
+        y = np.asarray(y, dtype=float)
 
-    # le coeur de ml --> le Gradient Descent --> 
+        if y.ndim == 1:
+            y = y.reshape(-1, 1)
 
-    # w nouveau = w ancien - learning_rate * gradient
+        if y.ndim != 2 or y.shape[1] != 1:
+            raise ValueError("y doit contenir une seule colonne.")
 
+        if len(X) != len(y):
+            raise ValueError("X et y doivent avoir le même nombre de lignes.")
 
-    # Apprends les meilleurs weights et bias possibles à partir de mes données X et y : 
+        if not np.all(np.isfinite(y)):
+            raise ValueError("y contient des valeurs non finies.")
 
+        n_samples, n_features = X.shape
 
-    def fit(self,X,y) : 
-        n_samples , n_features = X.shape
-
-        self.weights = np.zeros((n_features,1))
-        self.bias = 0 
-
-
+        self.weights = np.zeros((n_features, 1))
+        self.bias = 0.0
         self.loss_history = []
 
-        # la boucle d'apprentissage : 
+        for _ in range(self.epochs):
+            y_pred = X @ self.weights + self.bias
+            errors = y_pred - y
 
-        for epoch in range(self.epochs) : 
+            loss = np.mean(errors ** 2)
 
-            y_pred = self.prediction(X)
-            loss = self.compute_loss(y,y_pred)
-            dw = (2 / n_samples) * X.T @ (y_pred - y)
+            if not np.isfinite(loss):
+                raise FloatingPointError(
+                    "Perte non finie : réduis le learning rate."
+                )
 
-            db = (2 / n_samples) * np.sum(y_pred - y)
+            self.loss_history.append(float(loss))
+
+            dw = (2 / n_samples) * (X.T @ errors)
+            db = (2 / n_samples) * np.sum(errors)
 
             self.weights -= self.learning_rate * dw
-
             self.bias -= self.learning_rate * db
 
-            self.loss_history.append(loss)
+            if not (
+                np.all(np.isfinite(self.weights))
+                and np.isfinite(self.bias)
+            ):
+                raise FloatingPointError(
+                    "Paramètres non finis : réduis le learning rate."
+                )
 
+        return self
 
-            
+    def predict(self, X):
+        if self.weights is None:
+            raise ValueError("Le modèle doit être entraîné avant predict().")
 
+        X = self._validate_X(X)
+
+        if X.shape[1] != len(self.weights):
+            raise ValueError("Nombre de caractéristiques incorrect.")
+
+        return X @ self.weights + self.bias
